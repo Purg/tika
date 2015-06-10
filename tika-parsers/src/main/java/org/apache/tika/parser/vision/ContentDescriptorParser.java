@@ -51,74 +51,76 @@ import org.apache.commons.httpclient.params.HttpMethodParams;
 
 public class ContentDescriptorParser implements Parser {
 
-  private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-  private static final Set<MediaType> SUPPORTED_TYPES =
-      Collections.unmodifiableSet(new HashSet<MediaType>(Arrays.asList(
-          MediaType.image("jpeg"),
-          MediaType.image("png"))));
+    private static final Set<MediaType> SUPPORTED_TYPES =
+            Collections.unmodifiableSet(new HashSet<MediaType>(Arrays.asList(
+                MediaType.image("jpeg"),
+                MediaType.image("png")
+            )));
 
-  public Set<MediaType> getSupportedTypes(ParseContext context) {
-    return SUPPORTED_TYPES;
-  }
+    public Set<MediaType> getSupportedTypes(ParseContext context) {
+        return SUPPORTED_TYPES;
+    }
 
-  public void parse(InputStream stream, ContentHandler handler,
-      Metadata metadata, ParseContext context)
-          throws IOException, SAXException, TikaException {
+    public void parse(InputStream stream, ContentHandler handler,
+                      Metadata metadata, ParseContext context)
+            throws IOException, SAXException, TikaException {
 
-    String type = metadata.get(Metadata.CONTENT_TYPE);
-    if (type != null) {
+        String type = metadata.get(Metadata.CONTENT_TYPE);
+        if (type != null) {
 
-      TemporaryResources tmp = new TemporaryResources();
-      try {
-        TikaInputStream tis = TikaInputStream.get(stream, tmp);
+            TemporaryResources tmp = new TemporaryResources();
+            try {
+                TikaInputStream tis = TikaInputStream.get(stream, tmp);
 
-        HttpClient client = new HttpClient();
+                HttpClient client = new HttpClient();
 
-        // Create a method instance. User web service running locally for now
-        GetMethod method = new GetMethod("http://localhost:8080/vision?images=" + tis.getFile());
+                // Create a method instance. User web service running locally for now
+                GetMethod method =
+                        new GetMethod("http://localhost:8080/vision?images=" + tis.getFile());
 
-        // Provide custom retry handler is necessary
-        method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
-            new DefaultHttpMethodRetryHandler(3, false));
+                // Provide custom retry handler is necessary
+                method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
+                    new DefaultHttpMethodRetryHandler(3, false));
 
-        try {
-          // Execute the method.
-          int statusCode = client.executeMethod(method);
+                try {
+                    // Execute the method.
+                    int statusCode = client.executeMethod(method);
 
-          if (statusCode != HttpStatus.SC_OK) {
-            System.err.println("Method failed: " + method.getStatusLine());
-          }
+                    if (statusCode != HttpStatus.SC_OK) {
+                      System.err.println("Method failed: " + method.getStatusLine());
+                    }
 
-          // Read the response body.
-          // NOTE: We may want to use getResponseBodyAsStream() in the future
-          // in case the response is very large
-          String response = method.getResponseBodyAsString();
+                    // Read the response body.
+                    // NOTE: We may want to use getResponseBodyAsStream() in the future
+                    // in case the response is very large
+                    String response = method.getResponseBodyAsString();
 
-          // NOTE: Currenly our backend is setup for the histogram only
-          metadata.set("vision", response);
-        } catch (HttpException e) {
-          System.err.println("Fatal protocol violation: " + e.getMessage());
-          e.printStackTrace();
-        } catch (IOException e) {
-          System.err.println("Fatal transport error: " + e.getMessage());
-          e.printStackTrace();
-        } finally {
-          // Release the connection.
-          method.releaseConnection();
+                    // NOTE: Currenly our backend is setup for the histogram only
+                    metadata.set("vision", response);
+                } catch (HttpException e) {
+                    System.err.println("Fatal protocol violation: " + e.getMessage());
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    System.err.println("Fatal transport error: " + e.getMessage());
+                    e.printStackTrace();
+                } finally {
+                    // Release the connection.
+                    method.releaseConnection();
+                }
+
+                XHTMLContentHandler xhtml = new XHTMLContentHandler(handler, metadata);
+                xhtml.startDocument();
+                xhtml.endDocument();
+            } finally {
+                tmp.dispose();
+            }
         }
 
         XHTMLContentHandler xhtml = new XHTMLContentHandler(handler, metadata);
         xhtml.startDocument();
         xhtml.endDocument();
-      } finally {
-        tmp.dispose();
-      }
     }
-
-    XHTMLContentHandler xhtml = new XHTMLContentHandler(handler, metadata);
-    xhtml.startDocument();
-    xhtml.endDocument();
-  }
 
 }
